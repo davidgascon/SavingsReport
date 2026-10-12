@@ -100,22 +100,39 @@ def _step_lookup(rows: list, date_key: str, value_key: str):
     return lookup
 
 
+def baseline_watts(devices: list, d: date) -> float:
+    """Watts of the baseline devices (router, switch...) running on day d.
+
+    A device with no `since` date counts from the start of the history.
+    """
+    return sum(
+        float(dev["watts"]) for dev in devices
+        if not dev.get("since") or parse_date(dev["since"]) <= d
+    )
+
+
 def electricity(data: dict, today: date) -> dict:
     """Daily kWh and cost from watt readings and $/kWh rates, grouped by calendar month.
 
     Counts whole days from the rack-online date (or the first reading if unset)
     up to, not including, today. Both readings and rates back-fill to the start.
+    Baseline devices are draw I'd have anyway; their kWh, capped at the measured
+    draw, is credited back at the same rate.
     """
     readings = data.get("power_readings") or []
     rates = data.get("rates") or []
+    devices = data.get("baseline_devices") or []
     result = {
         "available": bool(readings and rates),
         "months": [],
         "total_kwh": 0.0,
         "total_cost": 0.0,
+        "total_credit": 0.0,
         "current_watts": None,
+        "current_baseline_watts": baseline_watts(devices, today),
         "current_rate": None,
         "current_month_cost": 0.0,
+        "current_month_credit": 0.0,
         "start_date": None,
     }
     if not result["available"]:
@@ -129,22 +146,32 @@ def electricity(data: dict, today: date) -> dict:
     months = {}
     d = start
     while d < today:
-        kwh = watts_on(d) * 24 / 1000
-        bucket = months.setdefault(month_key(d), {"month": month_key(d), "kwh": 0.0, "cost": 0.0})
+        watts = watts_on(d)
+        rate = rate_on(d)
+        kwh = watts * 24 / 1000
+        credit_kwh = min(baseline_watts(devices, d), watts) * 24 / 1000
+        bucket = months.setdefault(month_key(d), {
+            "month": month_key(d), "kwh": 0.0, "cost": 0.0, "credit_kwh": 0.0, "credit": 0.0,
+        })
         bucket["kwh"] += kwh
-        bucket["cost"] += kwh * rate_on(d)
+        bucket["cost"] += kwh * rate
+        bucket["credit_kwh"] += credit_kwh
+        bucket["credit"] += credit_kwh * rate
         d += timedelta(days=1)
 
     current_watts = watts_on(today)
     current_rate = rate_on(today)
-    days_this_month = calendar.monthrange(today.year, today.month)[1]
+    month_hours = 24 * calendar.monthrange(today.year, today.month)[1]
+    credit_watts = min(result["current_baseline_watts"], current_watts)
     result.update(
         months=[months[k] for k in sorted(months)],
         total_kwh=sum(m["kwh"] for m in months.values()),
         total_cost=sum(m["cost"] for m in months.values()),
+        total_credit=sum(m["credit"] for m in months.values()),
         current_watts=current_watts,
         current_rate=current_rate,
-        current_month_cost=current_watts * 24 * days_this_month / 1000 * current_rate,
+        current_month_cost=current_watts * month_hours / 1000 * current_rate,
+        current_month_credit=credit_watts * month_hours / 1000 * current_rate,
         start_date=start.isoformat(),
     )
     return result
@@ -213,14 +240,19 @@ def summarize(data: dict, today: date, view: str = "me", elec: dict = None) -> d
         })
 
     # Electricity is an expense for Me, so it is in both views (rule 3).
+    # The baseline credit is a saving for Me in the Power category.
     if elec["available"]:
         spent += elec["total_cost"]
-        if elec["total_cost"]:
+        saved += elec["total_credit"]
+        if elec["total_cost"] or elec["total_credit"]:
             cat = by_category.setdefault(POWER_CATEGORY, {"saved": 0.0, "spent": 0.0})
             cat["spent"] += elec["total_cost"]
+            cat["saved"] += elec["total_credit"]
+        if elec["total_credit"]:
+            by_person[ME] = by_person.get(ME, 0.0) + elec["total_credit"]
         for m in elec["months"]:
-            by_month[m["month"]] = by_month.get(m["month"], 0.0) - m["cost"]
-        run_rate -= elec["current_month_cost"]
+            by_month[m["month"]] = by_month.get(m["month"], 0.0) - m["cost"] + m["credit"]
+        run_rate += elec["current_month_credit"] - elec["current_month_cost"]
         elec_start = parse_date(elec["start_date"])
         if first_date is None or elec_start < first_date:
             first_date = elec_start

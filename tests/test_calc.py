@@ -224,3 +224,48 @@ def test_timeline_is_cumulative_by_month_with_gaps_filled():
     t = calc.summarize(d, TODAY)["timeline"]
     assert [p["month"] for p in t] == ["2026-07", "2026-08", "2026-09", "2026-10"]
     assert [p["net"] for p in t] == pytest.approx([-300, -300, -200, -100])
+
+
+# --- Baseline credit -----------------------------------------------------------
+
+def baseline_data(devices, watts=100):
+    d = data(readings=[{"id": "a", "date": "2026-10-01", "watts": watts}],
+             rates=RATE, rack_online="2026-10-01")
+    d["baseline_devices"] = devices
+    return d
+
+
+def test_baseline_devices_credit_their_kwh_at_the_rate():
+    d = baseline_data([{"id": "r", "name": "Router", "watts": 15},
+                       {"id": "s", "name": "Switch", "watts": 25}])
+    e = calc.electricity(d, TODAY)
+    assert e["total_cost"] == pytest.approx(10 * 24 * 100 / 1000 * 0.10)
+    assert e["total_credit"] == pytest.approx(10 * 24 * 40 / 1000 * 0.10)
+    assert e["current_baseline_watts"] == 40
+    assert e["current_month_credit"] == pytest.approx(31 * 24 * 40 / 1000 * 0.10)
+
+
+def test_baseline_credit_never_exceeds_measured_draw():
+    d = baseline_data([{"id": "r", "name": "Router", "watts": 500}], watts=100)
+    e = calc.electricity(d, TODAY)
+    assert e["total_credit"] == pytest.approx(e["total_cost"])
+
+
+def test_baseline_device_since_date():
+    d = baseline_data([{"id": "r", "name": "New router", "watts": 50, "since": "2026-10-06"}])
+    e = calc.electricity(d, TODAY)
+    assert e["total_credit"] == pytest.approx(5 * 24 * 50 / 1000 * 0.10)  # Oct 6-10
+
+
+def test_baseline_credit_in_totals_both_views():
+    d = baseline_data([{"id": "r", "name": "Router", "watts": 40}])
+    cost, credit = 10 * 24 * 0.1 * 0.10, 10 * 24 * 0.04 * 0.10
+    for view in calc.VIEWS:
+        s = calc.summarize(d, TODAY, view)
+        assert s["spent"] == pytest.approx(cost)
+        assert s["saved"] == pytest.approx(credit)
+        assert s["net"] == pytest.approx(credit - cost)
+        assert s["run_rate"] == pytest.approx(-31 * 24 * 0.06 * 0.10)
+        power = [c for c in s["by_category"] if c["category"] == "Power"][0]
+        assert power["saved"] == pytest.approx(credit)
+        assert s["timeline"][-1]["net"] == pytest.approx(credit - cost)

@@ -80,6 +80,12 @@ class RateIn(BaseModel):
     rate_per_kwh: float = Field(gt=0)
 
 
+class BaselineIn(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    watts: float = Field(gt=0)
+    since: Optional[dt.date] = None
+
+
 class SettingsIn(BaseModel):
     rack_online_since: Optional[date] = None
 
@@ -294,6 +300,22 @@ def add_rate(body: RateIn):
 def delete_rate(rate_id: str):
     data = _load()
     del data["rates"][_find(data["rates"], rate_id)]
+    _save(data)
+
+
+@app.post("/api/baseline", status_code=201)
+def add_baseline(body: BaselineIn):
+    data = _load()
+    record = {"id": store.new_id(), "name": body.name.strip(), "watts": body.watts, "since": _iso(body.since)}
+    data["baseline_devices"].append(record)
+    _save(data)
+    return record
+
+
+@app.delete("/api/baseline/{device_id}", status_code=204)
+def delete_baseline(device_id: str):
+    data = _load()
+    del data["baseline_devices"][_find(data["baseline_devices"], device_id)]
     _save(data)
 
 

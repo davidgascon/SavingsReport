@@ -153,3 +153,17 @@ def test_editor_page_served(client):
     r = client.get("/")
     assert r.status_code == 200
     assert "Savings Editor" in r.text
+
+
+def test_baseline_devices(client):
+    client.post("/api/readings", json={"date": "2026-10-01", "watts": 100})
+    client.post("/api/rates", json={"effective_date": "2026-01-01", "rate_per_kwh": 0.10})
+    client.put("/api/settings", json={"rack_online_since": "2026-10-01"})
+    r = client.post("/api/baseline", json={"name": "Router", "watts": 40})
+    assert r.status_code == 201
+    assert r.json()["since"] is None
+    me = client.get("/api/status").json()["summary"]["me"]
+    assert me["saved"] == pytest.approx(10 * 24 * 0.04 * 0.10)
+    assert client.post("/api/baseline", json={"name": "Switch", "watts": 0}).status_code == 422
+    assert client.delete("/api/baseline/" + r.json()["id"]).status_code == 204
+    assert client.get("/api/data").json()["baseline_devices"] == []

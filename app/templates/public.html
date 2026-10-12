@@ -25,6 +25,7 @@
   --s1: #2a78d6;
   --s2: #eb6834;
   --wash: rgba(42,120,214,0.08);
+  --base: #c3c2b7;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -42,13 +43,14 @@
     --s1: #3987e5;
     --s2: #d95926;
     --wash: rgba(57,135,229,0.12);
+    --base: #5a5955;
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
   --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
   --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10); --good: #0ca30c;
-  --bad: #e66767; --s1: #3987e5; --s2: #d95926; --wash: rgba(57,135,229,0.12);
+  --bad: #e66767; --s1: #3987e5; --s2: #d95926; --wash: rgba(57,135,229,0.12); --base: #5a5955;
 }
 * { box-sizing: border-box; }
 body {
@@ -172,10 +174,13 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
     <div id="elec-body">
       <div class="tiles">
         <div><div class="label">Current draw</div><div class="value" id="watts"></div></div>
+        <div class="baseline-only"><div class="label">Baseline credited</div><div class="value" id="base-watts"></div></div>
         <div><div class="label">Rate</div><div class="value" id="rate"></div></div>
-        <div><div class="label">This month (est.)</div><div class="value" id="elec-month"></div></div>
-        <div><div class="label">Total to date</div><div class="value" id="elec-total"></div></div>
+        <div><div class="label" id="elec-month-label">This month (est.)</div><div class="value" id="elec-month"></div></div>
+        <div><div class="label">Bill to date</div><div class="value" id="elec-total"></div></div>
+        <div class="baseline-only"><div class="label">Baseline credit to date</div><div class="value" id="elec-credit"></div></div>
       </div>
+      <div class="legend baseline-only"><span><i class="swatch" style="background:var(--s1)"></i>Rack (net)</span><span><i class="swatch" style="background:var(--base)"></i>Baseline (credited)</span></div>
       <div class="chart" id="elec-chart"></div>
       <details><summary>Show data</summary><div class="table-wrap"><table id="elec-table"></table></div></details>
     </div>
@@ -328,15 +333,29 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
     });
     var slot = iw / months.length, bw = Math.max(4, Math.min(40, slot - 4));
     var every = xLabelEvery(months.length, iw), firstShown = (months.length - 1) % every;
+    // Stacked: rack's net cost at the base, credited baseline on top; together the full bill.
     months.forEach(function (p, i) {
-      var cx = m.l + slot * i + slot / 2, h = Math.max(0, y(0) - y(p.cost));
-      var bar = svgEl("path", { d: topRounded(cx - bw / 2, y(p.cost), bw, h, 4), fill: "var(--s1)" });
+      var cx = m.l + slot * i + slot / 2, x0 = cx - bw / 2;
+      var net = p.cost - p.credit, g = svgEl("g", {});
+      var netH = Math.max(0, y(0) - y(net)), totalTop = y(p.cost);
+      if (p.credit > 0) {
+        if (netH > 0) g.appendChild(svgEl("rect", { x: x0, y: y(net), width: bw, height: netH, fill: "var(--s1)" }));
+        var baseH = Math.max(0, y(net) - totalTop - (netH > 0 ? 2 : 0));
+        g.appendChild(svgEl("path", { d: topRounded(x0, totalTop, bw, baseH, 4), fill: "var(--base)" }));
+      } else {
+        g.appendChild(svgEl("path", { d: topRounded(x0, y(p.cost), bw, netH, 4), fill: "var(--s1)" }));
+      }
       var hit = svgEl("rect", { x: m.l + slot * i, y: m.t, width: slot, height: ih, fill: "transparent" });
-      function over(ev) { bar.setAttribute("opacity", "0.8"); showTip("<b>" + monthLabel(p.month, true) + "</b><br>" + money(p.cost) + "<br>" + Math.round(p.kwh).toLocaleString() + " kWh", ev.clientX, ev.clientY); }
+      function over(ev) {
+        g.setAttribute("opacity", "0.8");
+        var html = "<b>" + monthLabel(p.month, true) + "</b><br>Bill " + money(p.cost) + " (" + Math.round(p.kwh).toLocaleString() + " kWh)";
+        if (p.credit > 0) html += "<br>Baseline credit −" + money(p.credit) + "<br>Rack net " + money(net);
+        showTip(html, ev.clientX, ev.clientY);
+      }
       hit.addEventListener("pointermove", over);
       hit.addEventListener("pointerdown", over);
-      hit.addEventListener("pointerleave", function () { bar.setAttribute("opacity", "1"); hideTip(); });
-      svg.appendChild(bar);
+      hit.addEventListener("pointerleave", function () { g.setAttribute("opacity", "1"); hideTip(); });
+      svg.appendChild(g);
       svg.appendChild(hit);
       if ((months.length - 1 - i) % every === 0) {
         var lab = svgEl("text", { x: cx, y: H - 6, "text-anchor": "middle" });
@@ -435,14 +454,22 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
     var E = R.electricity;
     if (E.available) {
       $("elec-body").classList.remove("hidden");
-      $("elec-sub").textContent = "Estimated from logged average-watt readings since " + dateLabel(E.start_date) + ". Counted in both views.";
+      $("elec-sub").textContent = "Estimated from logged average-watt readings since " + dateLabel(E.start_date) + ". Gear I'd run anyway (router, switch) is credited back as a baseline. Counted in both views.";
       $("watts").textContent = Math.round(E.current_watts) + " W";
       $("rate").textContent = "$" + E.current_rate.toFixed(4).replace(/0+$/, "").replace(/\.$/, "") + "/kWh";
-      $("elec-month").textContent = money(E.current_month_cost);
+      var hasBase = E.total_credit > 0 || E.current_baseline_watts > 0;
+      document.querySelectorAll(".baseline-only").forEach(function (n) { n.classList.toggle("hidden", !hasBase); });
+      $("base-watts").textContent = "−" + Math.round(Math.min(E.current_baseline_watts, E.current_watts)) + " W";
+      $("elec-month-label").textContent = hasBase ? "This month, rack net (est.)" : "This month (est.)";
+      $("elec-month").textContent = money(E.current_month_cost - E.current_month_credit);
       $("elec-total").textContent = money(E.total_cost);
+      $("elec-credit").textContent = "−" + money(E.total_credit);
       columnChart($("elec-chart"), E.months);
-      table($("elec-table"), ["Month", "kWh", "Cost"],
-        E.months.map(function (p) { return [monthLabel(p.month, true), Math.round(p.kwh).toLocaleString(), money(p.cost)]; }), [1, 2]);
+      table($("elec-table"), hasBase ? ["Month", "kWh", "Bill", "Baseline credit", "Rack net"] : ["Month", "kWh", "Cost"],
+        E.months.map(function (p) {
+          var row = [monthLabel(p.month, true), Math.round(p.kwh).toLocaleString(), money(p.cost)];
+          return hasBase ? row.concat(["−" + money(p.credit), money(p.cost - p.credit)]) : row;
+        }), hasBase ? [1, 2, 3, 4] : [1, 2]);
     } else {
       $("elec-body").classList.add("hidden");
       $("elec-sub").textContent = "No power readings or utility rate logged yet.";

@@ -16,6 +16,7 @@ DEFAULT_DATA = {
     "entries": [],
     "power_readings": [],
     "rates": [],
+    "baseline_devices": [],
 }
 
 _lock = threading.RLock()

@@ -1,4 +1,4 @@
-# Homelab Savings Report — Spec v1.4
+# Homelab Savings Report — Spec v1.5
 
 Oct 11, 2026 · David Gascon
 
@@ -72,7 +72,7 @@ All totals are computed at build time from the entry list; nothing accrued is st
 2. **Monthly entries** count once on start_date and again on the same day each month after, through the earlier of today or end_date.
    1. A start on the 29th to 31st falls on the last day of shorter months.
    2. Worked example: Apple TV+ from 2026-01-04, ongoing, as of 2026-10-11 = 10 charges (Jan 4 through Oct 4) × $10.74 = $107.40 saved.
-3. **Electricity** is an expense computed from power readings (see Electricity), category Power, beneficiary Me.
+3. **Electricity** is an expense computed from power readings (see Electricity), category Power, beneficiary Me. The baseline credit (see Electricity) counts as savings in Power, beneficiary Me, in both views.
 4. **Net position** = total savings to date − total expenses to date. Positive means the rack is ahead.
 5. **Two views** of every total:
    1. **Me:** only entries with beneficiary Me, plus all expenses and electricity.
@@ -100,6 +100,8 @@ cost = kWh × rate
 Worked example: 350 W over a 30-day month = 350 × 720 ÷ 1000 = 252 kWh, then × your rate. Costs are computed per calendar month, so the chart and the monthly run rate use the same numbers. Whole days are counted up to yesterday. Rates back-fill like readings: the earliest rate is carried back to the rack-online date.
 
 The estimate gets more accurate as readings are logged after hardware changes. Pulling watts automatically from a UPS or smart plug is a v2 candidate.
+
+Baseline devices are gear I'd run without the rack, such as the router and switch. Each has a name, watts, and an optional since date (blank = always). Each day, their total watts, capped at that day's measured draw, are credited back at the same $/kWh rate. The public page shows the full bill, the baseline credit, and the rack's net.
 
 ## Public page contents
 
@@ -147,6 +149,7 @@ Every change to scope, rules, or architecture gets a row here, newest first, wit
 
 | Date | Version | Decision |
 | --- | --- | --- |
+| 2026-10-11 | v1.5 | Baseline devices (router, switch) with watts and optional since date; their kWh, capped at measured draw, is credited back at the utility rate as Power savings |
 | 2026-10-11 | v1.4 | Dark mode is the default on the public page and editor, with a light toggle remembered per browser |
 | 2026-10-11 | v1.3 | Publish freezes a data snapshot; page re-renders daily from it. Electricity counts whole days to yesterday; earliest rate back-fills. Break-even date = whole months + leftover days. "Me" is permanent; list values in use can't be removed |
 | 2026-10-11 | v1.2 | Stack: Python/FastAPI editor + nginx static server in one Docker Compose stack on Ubuntu, deployed via Portainer. Ports: public 8085, admin 8086 (LAN only) |
