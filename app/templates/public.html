@@ -107,6 +107,9 @@ th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--grid
 th { color: var(--ink-2); font-weight: 600; font-size: 12px; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 tr.ended td { color: var(--muted); }
+th button.sort { border: 0; background: none; color: inherit; font: inherit; padding: 0; cursor: pointer; white-space: nowrap; }
+th button.sort:hover { color: var(--ink); }
+th .arrow { display: inline-block; width: 1em; font-size: 10px; text-align: center; }
 details { margin-top: 10px; font-size: 13px; }
 summary { color: var(--ink-2); cursor: pointer; }
 .empty { color: var(--muted); font-size: 13px; padding: 12px 0; }
@@ -416,6 +419,73 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
     host.appendChild(tbody);
   }
 
+  // --- Entries table (sortable; default by name) ---------------------------
+  function typeLabel(r) { return (r.direction === "savings" ? "Saving" : "Expense") + " · " + (r.frequency === "monthly" ? "monthly" : "one-time"); }
+  // Hardware costs read "Hardware - item" so they group together when sorted by name.
+  function displayName(r) {
+    if (r.category !== "Hardware" || r.direction !== "expense" || /^hardware\s*[-–—]/i.test(r.name)) return r.name;
+    return "Hardware - " + r.name;
+  }
+  var ENTRY_COLS = [
+    { label: "Name", key: displayName, cell: displayName },
+    { label: "Type", key: typeLabel, cell: typeLabel },
+    { label: "Category", key: function (r) { return r.category; }, cell: function (r) { return r.category; } },
+    { label: "For", key: function (r) { return r.beneficiary; }, cell: function (r) { return r.beneficiary; } },
+    { label: "Amount", num: true, key: function (r) { return r.amount; }, cell: function (r) { return money(r.amount) + (r.frequency === "monthly" ? "/mo" : ""); } },
+    { label: "Since", key: function (r) { return r.start_date; }, cell: function (r) { return dateLabel(r.start_date); } },
+    // One-time rows have no end (always last); ongoing sorts after any dated end.
+    { label: "Ends", key: function (r) { return r.frequency === "monthly" ? (r.end_date || "9999-12-31") : null; },
+      cell: function (r) { return r.frequency === "monthly" ? (r.end_date ? dateLabel(r.end_date) : "ongoing") : ""; } },
+    { label: "To date", num: true, key: function (r) { return r.to_date; }, cell: function (r) { return signed(r.to_date); } }
+  ];
+  var entrySort = { col: "Name", dir: 1 };
+  try {
+    var savedSort = JSON.parse(localStorage.getItem("entrySort"));
+    if (savedSort && ENTRY_COLS.some(function (c) { return c.label === savedSort.col; }) && (savedSort.dir === 1 || savedSort.dir === -1)) entrySort = savedSort;
+  } catch (e) {}
+
+  function byText(a, b) { return String(a).localeCompare(String(b), undefined, { sensitivity: "base", numeric: true }); }
+  function sortRows(rows, cols, sort) {
+    var col = cols.filter(function (c) { return c.label === sort.col; })[0] || cols[0];
+    return rows.slice().sort(function (a, b) {
+      var x = col.key(a), y = col.key(b), c = 0;
+      if (x == null || y == null) c = (x == null) - (y == null); // blanks last either way
+      else c = (typeof x === "number" ? x - y : byText(x, y)) * sort.dir;
+      return c || byText(displayName(a), displayName(b));
+    });
+  }
+
+  function renderEntries(rows) {
+    var host = $("entries");
+    host.innerHTML = "";
+    if (!rows.length) { host.appendChild(el("caption", { class: "empty" }, "No entries yet.")); return; }
+    var thead = el("thead"), htr = el("tr");
+    ENTRY_COLS.forEach(function (c) {
+      var active = c.label === entrySort.col;
+      var th = el("th", c.num ? { class: "num" } : {});
+      th.setAttribute("aria-sort", active ? (entrySort.dir === 1 ? "ascending" : "descending") : "none");
+      var b = el("button", { type: "button", class: "sort" });
+      var arrow = el("span", { class: "arrow", "aria-hidden": "true" }, active ? (entrySort.dir === 1 ? "▲" : "▼") : "");
+      if (c.num) { b.appendChild(arrow); b.appendChild(document.createTextNode(c.label)); }
+      else { b.appendChild(document.createTextNode(c.label)); b.appendChild(arrow); }
+      b.addEventListener("click", function () {
+        entrySort = { col: c.label, dir: active ? -entrySort.dir : 1 };
+        try { localStorage.setItem("entrySort", JSON.stringify(entrySort)); } catch (e) {}
+        renderEntries(rows);
+      });
+      th.appendChild(b);
+      htr.appendChild(th);
+    });
+    thead.appendChild(htr); host.appendChild(thead);
+    var tbody = el("tbody");
+    sortRows(rows, ENTRY_COLS, entrySort).forEach(function (r) {
+      var tr = el("tr", r.frequency === "monthly" && !r.active ? { class: "ended" } : {});
+      ENTRY_COLS.forEach(function (c) { tr.appendChild(el("td", c.num ? { class: "num" } : {}, c.cell(r))); });
+      tbody.appendChild(tr);
+    });
+    host.appendChild(tbody);
+  }
+
   // --- Render --------------------------------------------------------------
   function render() {
     var S = R.views[view];
@@ -475,26 +545,7 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
       $("elec-sub").textContent = "No power readings or utility rate logged yet.";
     }
 
-    var rows = S.entries;
-    if (!rows.length) {
-      $("entries").innerHTML = "";
-      $("entries").appendChild(el("caption", { class: "empty" }, "No entries yet."));
-    } else {
-      table($("entries"), ["Name", "Type", "Category", "For", "Amount", "Since", "Ends", "To date"],
-        rows.map(function (r) {
-          return [
-            r.name,
-            (r.direction === "savings" ? "Saving" : "Expense") + " · " + (r.frequency === "monthly" ? "monthly" : "one-time"),
-            r.category,
-            r.beneficiary,
-            money(r.amount) + (r.frequency === "monthly" ? "/mo" : ""),
-            dateLabel(r.start_date),
-            r.frequency === "monthly" ? (r.end_date ? dateLabel(r.end_date) : "ongoing") : "",
-            signed(r.to_date)
-          ];
-        }), [4, 7],
-        rows.map(function (r) { return r.frequency === "monthly" && !r.active ? "ended" : ""; }));
-    }
+    renderEntries(S.entries);
 
     $("updated").textContent = "Last updated " + new Date(R.generated_at).toLocaleString() + " · totals as of " + dateLabel(R.today);
   }

@@ -78,6 +78,9 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 td.notes { white-space: normal; color: var(--muted); max-width: 260px; }
 tr.ended td { color: var(--muted); }
 tr.editing td { background: var(--wash); }
+th button.sort { border: 0; background: none; color: inherit; font: inherit; padding: 0; border-radius: 0; cursor: pointer; white-space: nowrap; }
+th button.sort:hover { color: var(--ink); }
+th .arrow { display: inline-block; width: 1em; font-size: 10px; text-align: center; }
 .empty { color: var(--muted); padding: 8px 0; }
 .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
 details summary { cursor: pointer; color: var(--ink-2); font-size: 13px; margin-bottom: 8px; }
@@ -311,10 +314,79 @@ details summary { cursor: pointer; color: var(--ink-2); font-size: 13px; margin-
     if (document.activeElement !== lists.people) lists.people.value = data.people.join("\n");
   }
 
+  // --- Entries table (sortable; default by name) ---------------------------
+  function typeLabel(e) { return (e.direction === "savings" ? "Saving" : "Expense") + " · " + (e.frequency === "monthly" ? "monthly" : "one-time"); }
+  // Hardware costs read "Hardware - item" so they group together when sorted by name.
+  function displayName(e) {
+    if (e.category !== "Hardware" || e.direction !== "expense" || /^hardware\s*[-–—]/i.test(e.name)) return e.name;
+    return "Hardware - " + e.name;
+  }
+  var ENTRY_COLS = [
+    { label: "Name", key: displayName },
+    { label: "Type", key: typeLabel },
+    { label: "Category", key: function (e) { return e.category; } },
+    { label: "For", key: function (e) { return e.beneficiary; } },
+    { label: "Amount", num: true, key: function (e) { return e.amount; } },
+    { label: "Start", key: function (e) { return e.start_date; } },
+    // One-time rows have no end (always last); ongoing sorts after any dated end.
+    { label: "End", key: function (e) { return e.frequency === "monthly" ? (e.end_date || "9999-12-31") : null; } },
+    { label: "To date", num: true, key: function (e) { return status.to_date[e.id] || 0; } },
+    { label: "Notes", key: function (e) { return e.notes || null; } },
+    { label: "" }
+  ];
+  var entrySort = { col: "Name", dir: 1 };
+  try {
+    var savedSort = JSON.parse(localStorage.getItem("entrySort"));
+    if (savedSort && ENTRY_COLS.some(function (c) { return c.key && c.label === savedSort.col; }) && (savedSort.dir === 1 || savedSort.dir === -1)) entrySort = savedSort;
+  } catch (e) {}
+
+  function byText(a, b) { return String(a).localeCompare(String(b), undefined, { sensitivity: "base", numeric: true }); }
+  function sortRows(rows) {
+    var col = ENTRY_COLS.filter(function (c) { return c.key && c.label === entrySort.col; })[0] || ENTRY_COLS[0];
+    return rows.slice().sort(function (a, b) {
+      var x = col.key(a), y = col.key(b), c = 0;
+      if (x == null || y == null) c = (x == null) - (y == null); // blanks last either way
+      else c = (typeof x === "number" ? x - y : byText(x, y)) * entrySort.dir;
+      return c || byText(displayName(a), displayName(b));
+    });
+  }
+  function sortHeader(table) {
+    table.innerHTML = "";
+    var tr = document.createElement("tr");
+    ENTRY_COLS.forEach(function (c) {
+      var th = document.createElement("th");
+      if (c.num) th.className = "num";
+      if (c.key) {
+        var active = c.label === entrySort.col;
+        th.setAttribute("aria-sort", active ? (entrySort.dir === 1 ? "ascending" : "descending") : "none");
+        var b = document.createElement("button");
+        b.type = "button"; b.className = "sort";
+        var arrow = document.createElement("span");
+        arrow.className = "arrow"; arrow.setAttribute("aria-hidden", "true");
+        arrow.textContent = active ? (entrySort.dir === 1 ? "▲" : "▼") : "";
+        if (c.num) { b.appendChild(arrow); b.appendChild(document.createTextNode(c.label)); }
+        else { b.appendChild(document.createTextNode(c.label)); b.appendChild(arrow); }
+        b.addEventListener("click", function () {
+          entrySort = { col: c.label, dir: active ? -entrySort.dir : 1 };
+          try { localStorage.setItem("entrySort", JSON.stringify(entrySort)); } catch (e) {}
+          renderEntries();
+        });
+        th.appendChild(b);
+      }
+      tr.appendChild(th);
+    });
+    var thead = document.createElement("thead");
+    thead.appendChild(tr);
+    table.appendChild(thead);
+    var tbody = document.createElement("tbody");
+    table.appendChild(tbody);
+    return tbody;
+  }
+
   function renderEntries() {
     var table = $("entries");
-    var rows = data.entries.slice().sort(function (a, b) { return a.start_date < b.start_date ? 1 : a.start_date > b.start_date ? -1 : 0; });
-    var tbody = header(table, ["Name", "Type", "Category", "For", "Amount", "Start", "End", "To date", "Notes", ""], [4, 7]);
+    var rows = sortRows(data.entries);
+    var tbody = sortHeader(table);
     if (!rows.length) {
       var tr = document.createElement("tr"); var td = cell(tr, "No entries yet. Add one above.", "empty"); td.colSpan = 10; tbody.appendChild(tr);
       return;
@@ -325,8 +397,8 @@ details summary { cursor: pointer; color: var(--ink-2); font-size: 13px; margin-
       var ended = e.frequency === "monthly" && e.end_date && e.end_date < t;
       if (ended) tr.className = "ended";
       if (e.id === editingId) tr.className = "editing";
-      cell(tr, e.name);
-      cell(tr, (e.direction === "savings" ? "Saving" : "Expense") + " · " + (e.frequency === "monthly" ? "monthly" : "one-time"));
+      cell(tr, displayName(e));
+      cell(tr, typeLabel(e));
       cell(tr, e.category);
       cell(tr, e.beneficiary);
       cell(tr, usd.format(e.amount) + (e.frequency === "monthly" ? "/mo" : ""), "num");
