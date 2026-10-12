@@ -6,14 +6,16 @@ services:
     image: savings-report-editor:latest
     restart: unless-stopped
     environment:
-      TZ: ${TZ:-UTC}  # set to your zone, e.g. America/New_York, so "today" rolls over at local midnight
+      TZ: ${TZ:-America/Los_Angeles}  # Pacific (WA); "today" rolls over at local midnight
     ports:
       # LAN only. Docker publishes ports past ufw, so also keep 8086 un-forwarded in OPNsense,
       # or set ADMIN_BIND to the server's LAN IP to bind just that interface.
       - "${ADMIN_BIND:-0.0.0.0}:8086:8000"
     volumes:
-      - ${DATA_PATH:-/opt/savings-report/data}:/data
-      - site:/site
+      # Relative to this compose file. data/ holds entries.json + published.json (back it up);
+      # site/ holds the built index.html that nginx serves.
+      - ./data:/data
+      - ./site:/site
 
   public:
     build: ./public
@@ -22,9 +24,6 @@ services:
     ports:
       - "8085:80"
     volumes:
-      - site:/site:ro
+      - ./site:/site:ro
     depends_on:
       - editor
-
-volumes:
-  site:

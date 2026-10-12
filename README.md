@@ -17,7 +17,7 @@ tests/               pytest: calc rules + API
 ## How publishing works
 
 - The editor writes `entries.json`. Nothing public changes until you click **Publish**.
-- **Publish** copies `entries.json` to `published.json` and renders `index.html` into the `site` volume.
+- **Publish** copies `entries.json` to `published.json` and renders `index.html` into `./site`.
 - Totals accrue daily, so the editor re-renders `index.html` from `published.json` once a day. Unpublished edits never leak out this way.
 - nginx serves `/` only. Everything else returns 404. Notes and the data file are never in the page.
 
@@ -29,20 +29,23 @@ tests/               pytest: calc rules + API
 
    | Variable | Default | Purpose |
    | --- | --- | --- |
-   | `TZ` | `UTC` | Your zone, e.g. `America/New_York`, so "today" rolls over at local midnight |
-   | `DATA_PATH` | `/opt/savings-report/data` | Host folder for `entries.json` and `published.json`. Add it to your backups |
+   | `TZ` | `America/Los_Angeles` | Pacific time (WA). "Today" rolls over at local midnight |
    | `ADMIN_BIND` | `0.0.0.0` | Set to the server's LAN IP to bind the editor to that interface only |
 
 4. Deploy, open `http://<server>:8086`, and click **Publish** once.
+
+   Data lives in `./data` and the built page in `./site`, next to `docker-compose.yml`. Docker creates both on first start. Back up `./data`.
+   With a Portainer CE Repository stack, "next to the compose file" is Portainer's checkout folder (`/data/compose/<stack id>/` on the host), not a folder you chose. If you want the data somewhere predictable, run the stack from a clone instead (below).
 5. In OPNsense, forward 8085 only, or put it behind nginx Proxy Manager for TLS. Never forward 8086. Docker-published ports bypass ufw, so rely on OPNsense (or `ADMIN_BIND`) rather than ufw to keep 8086 on the LAN.
 
-Without a git remote, you can also run it straight on the server:
+Or run it from a clone on the server, so `./data` is wherever you cloned it:
 
 ```bash
-docker compose up -d --build
+git clone https://github.com/davidgascon/SavingsReport.git /opt/savings-report
+cd /opt/savings-report && docker compose up -d --build
 ```
 
-Portainer will list that stack as "limited" (it can't redeploy it), but it still runs.
+Portainer will list that stack as "limited" (it can't redeploy it), but it still runs. To update: `git pull && docker compose up -d --build`.
 
 ## Develop
 
