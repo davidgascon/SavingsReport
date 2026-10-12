@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Homelab Savings</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11,11,11,0.10);
+  --good: #006300;
+  --bad: #d03b3b;
+  --s1: #2a78d6;
+  --s2: #eb6834;
+  --wash: rgba(42,120,214,0.08);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255,255,255,0.10);
+    --good: #0ca30c;
+    --bad: #e66767;
+    --s1: #3987e5;
+    --s2: #d95926;
+    --wash: rgba(57,135,229,0.12);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10); --good: #0ca30c;
+  --bad: #e66767; --s1: #3987e5; --s2: #d95926; --wash: rgba(57,135,229,0.12);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--page); color: var(--ink);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+main { max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; }
+header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+h1 { font-size: 18px; margin: 0; font-weight: 600; }
+h2 { font-size: 15px; margin: 0 0 4px; font-weight: 600; }
+.sub { color: var(--ink-2); font-size: 13px; margin: 0 0 12px; }
+.toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; padding: 2px; background: var(--surface); }
+.toggle button {
+  border: 0; background: transparent; color: var(--ink-2); font: inherit; font-size: 13px;
+  padding: 6px 14px; border-radius: 6px; cursor: pointer;
+}
+.toggle button[aria-pressed="true"] { background: var(--wash); color: var(--ink); font-weight: 600; }
+.preview-banner { background: var(--wash); border: 1px dashed var(--s1); border-radius: 8px; padding: 8px 12px; margin-bottom: 16px; font-size: 13px; }
+.hero { margin: 28px 0 20px; }
+.hero .label { color: var(--ink-2); font-size: 13px; }
+.hero .value { font-size: clamp(40px, 11vw, 64px); font-weight: 650; line-height: 1.1; letter-spacing: -0.02em; }
+.hero .status { font-size: 14px; font-weight: 600; margin-top: 4px; }
+.pos { color: var(--good); }
+.neg { color: var(--bad); }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 28px; }
+.card, section.panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+.card { padding: 12px 14px; }
+.card .label { color: var(--ink-2); font-size: 12px; }
+.card .value { font-size: 20px; font-weight: 600; margin-top: 2px; }
+.card .note { color: var(--muted); font-size: 12px; }
+section.panel { padding: 16px; margin-bottom: 16px; }
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; width: 100%; overflow: visible; }
+.chart text { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.legend { display: flex; gap: 16px; font-size: 12px; color: var(--ink-2); margin-bottom: 10px; }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.bars { display: grid; grid-template-columns: minmax(80px, max-content) 1fr; gap: 6px 12px; align-items: center; }
+.bars .name { font-size: 13px; color: var(--ink-2); }
+.bars .pair { display: grid; gap: 2px; }
+.bar-row { display: flex; align-items: center; gap: 8px; min-height: 12px; }
+.bar { height: 12px; border-radius: 0 4px 4px 0; min-width: 2px; cursor: default; }
+.bar-val { font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.tiles .label { color: var(--ink-2); font-size: 12px; }
+.tiles .value { font-size: 18px; font-weight: 600; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+th { color: var(--ink-2); font-weight: 600; font-size: 12px; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tr.ended td { color: var(--muted); }
+details { margin-top: 10px; font-size: 13px; }
+summary { color: var(--ink-2); cursor: pointer; }
+.empty { color: var(--muted); font-size: 13px; padding: 12px 0; }
+#tip {
+  position: fixed; pointer-events: none; z-index: 10; display: none;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  font-variant-numeric: tabular-nums; max-width: 240px;
+}
+#tip b { font-weight: 600; }
+footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <!--PREVIEW_BANNER-->
+  <header>
+    <h1>Homelab Savings Report</h1>
+    <div class="toggle" role="group" aria-label="View">
+      <button type="button" data-view="me" aria-pressed="true">Me</button>
+      <button type="button" data-view="everyone" aria-pressed="false">Everyone</button>
+    </div>
+  </header>
+
+  <div class="hero">
+    <div class="label">Net position</div>
+    <div class="value" id="net"></div>
+    <div class="status" id="net-status"></div>
+  </div>
+
+  <div class="cards">
+    <div class="card"><div class="label">Total saved</div><div class="value" id="saved"></div></div>
+    <div class="card"><div class="label">Total spent</div><div class="value" id="spent"></div><div class="note">incl. electricity</div></div>
+    <div class="card"><div class="label">Monthly run rate</div><div class="value" id="run-rate"></div><div class="note">active monthly items</div></div>
+    <div class="card" id="be-card"><div class="label">Break-even</div><div class="value" id="be"></div><div class="note" id="be-note"></div></div>
+  </div>
+
+  <section class="panel">
+    <h2>Net over time</h2>
+    <p class="sub">Cumulative net at the end of each month. Above zero means the rack has paid for itself.</p>
+    <div class="chart" id="net-chart"></div>
+    <details><summary>Show data</summary><div class="table-wrap"><table id="net-table"></table></div></details>
+  </section>
+
+  <section class="panel">
+    <h2>By category</h2>
+    <p class="sub">Saved and spent to date.</p>
+    <div class="legend"><span><i class="swatch" style="background:var(--s1)"></i>Saved</span><span><i class="swatch" style="background:var(--s2)"></i>Spent</span></div>
+    <div class="bars" id="cat-bars"></div>
+  </section>
+
+  <section class="panel" id="person-panel">
+    <h2>Saved by person</h2>
+    <p class="sub">Savings to date, by who they benefit.</p>
+    <div class="bars" id="person-bars"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Electricity</h2>
+    <p class="sub" id="elec-sub"></p>
+    <div id="elec-body">
+      <div class="tiles">
+        <div><div class="label">Current draw</div><div class="value" id="watts"></div></div>
+        <div><div class="label">Rate</div><div class="value" id="rate"></div></div>
+        <div><div class="label">This month (est.)</div><div class="value" id="elec-month"></div></div>
+        <div><div class="label">Total to date</div><div class="value" id="elec-total"></div></div>
+      </div>
+      <div class="chart" id="elec-chart"></div>
+      <details><summary>Show data</summary><div class="table-wrap"><table id="elec-table"></table></div></details>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Entries</h2>
+    <div class="table-wrap"><table id="entries"></table></div>
+  </section>
+
+  <footer id="updated"></footer>
+</main>
+<div id="tip" role="tooltip"></div>
+
+<script id="report" type="application/json">/*__REPORT__*/</script>
+<script>
+(function () {
+  "use strict";
+  var R = JSON.parse(document.getElementById("report").textContent);
+  var view = "me";
+  try { if (localStorage.getItem("view") === "everyone") view = "everyone"; } catch (e) {}
+
+  var usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+  var usd0 = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+  var MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  var SVGNS = "http://www.w3.org/2000/svg";
+
+  function money(v) { return usd.format(v); }
+  function signed(v) { return (v > 0 ? "+" : v < 0 ? "−" : "") + usd.format(Math.abs(v)); }
+  function monthLabel(key, withYear) {
+    var p = key.split("-");
+    return MONTHS[+p[1] - 1] + (withYear ? " " + p[0] : "");
+  }
+  function dateLabel(iso) {
+    if (!iso) return "";
+    var p = iso.split("-");
+    return MONTHS[+p[1] - 1] + " " + (+p[2]) + ", " + p[0];
+  }
+  function $(id) { return document.getElementById(id); }
+  function el(tag, attrs, text) {
+    var n = document.createElement(tag);
+    for (var k in attrs || {}) n.setAttribute(k, attrs[k]);
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function svgEl(tag, attrs) {
+    var n = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  }
+
+  // --- Tooltip -------------------------------------------------------------
+  var tip = $("tip");
+  function showTip(html, x, y) {
+    tip.innerHTML = html;
+    tip.style.display = "block";
+    var w = tip.offsetWidth, h = tip.offsetHeight;
+    var left = Math.min(x + 12, window.innerWidth - w - 8);
+    var top = y - h - 12 < 8 ? y + 16 : y - h - 12;
+    tip.style.left = Math.max(8, left) + "px";
+    tip.style.top = top + "px";
+  }
+  function hideTip() { tip.style.display = "none"; }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+
+  // --- Scales --------------------------------------------------------------
+  function niceTicks(min, max, count) {
+    if (min === max) { max = min + 1; }
+    var span = max - min, step = Math.pow(10, Math.floor(Math.log10(span / count)));
+    var err = span / count / step;
+    if (err >= 7.5) step *= 10; else if (err >= 3.5) step *= 5; else if (err >= 1.5) step *= 2;
+    var lo = Math.floor(min / step) * step, hi = Math.ceil(max / step) * step, out = [];
+    for (var v = lo; v <= hi + step / 2; v += step) out.push(Math.round(v / step) * step);
+    return out;
+  }
+  function xLabelEvery(n, width) { return Math.max(1, Math.ceil(n / Math.max(2, Math.floor(width / 64)))); }
+
+  // --- Line chart: cumulative net ------------------------------------------
+  function lineChart(host, points) {
+    host.innerHTML = "";
+    if (!points.length) { host.appendChild(el("div", { class: "empty" }, "Nothing to chart yet.")); return; }
+    var W = host.clientWidth || 600, H = 240, m = { t: 12, r: 16, b: 26, l: 64 };
+    var iw = W - m.l - m.r, ih = H - m.t - m.b;
+    var vals = points.map(function (p) { return p.net; });
+    var ticks = niceTicks(Math.min(0, Math.min.apply(null, vals)), Math.max(0, Math.max.apply(null, vals)), 4);
+    var y0 = ticks[0], y1 = ticks[ticks.length - 1];
+    function x(i) { return m.l + (points.length === 1 ? iw / 2 : i * iw / (points.length - 1)); }
+    function y(v) { return m.t + ih - (v - y0) / (y1 - y0) * ih; }
+    var svg = svgEl("svg", { viewBox: "0 0 " + W + " " + H, height: H, role: "img", "aria-label": "Cumulative net by month" });
+
+    ticks.forEach(function (t) {
+      svg.appendChild(svgEl("line", { x1: m.l, x2: W - m.r, y1: y(t), y2: y(t), stroke: t === 0 ? "var(--axis)" : "var(--grid)", "stroke-width": t === 0 ? 1.5 : 1 }));
+      var lab = svgEl("text", { x: m.l - 8, y: y(t) + 4, "text-anchor": "end" });
+      lab.textContent = usd0.format(t);
+      svg.appendChild(lab);
+    });
+    var every = xLabelEvery(points.length, iw), firstShown = (points.length - 1) % every;
+    points.forEach(function (p, i) {
+      if ((points.length - 1 - i) % every) return;
+      var lab = svgEl("text", { x: x(i), y: H - 6, "text-anchor": "middle" });
+      lab.textContent = monthLabel(p.month, i === firstShown || p.month.slice(5) === "01");
+      svg.appendChild(lab);
+    });
+
+    var d = points.map(function (p, i) { return (i ? "L" : "M") + x(i).toFixed(1) + " " + y(p.net).toFixed(1); }).join(" ");
+    svg.appendChild(svgEl("path", { d: d, fill: "none", stroke: "var(--s1)", "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+    var last = points.length - 1;
+    svg.appendChild(svgEl("circle", { cx: x(last), cy: y(points[last].net), r: 4, fill: "var(--s1)", stroke: "var(--surface)", "stroke-width": 2 }));
+
+    var cross = svgEl("line", { y1: m.t, y2: m.t + ih, stroke: "var(--axis)", "stroke-width": 1, visibility: "hidden" });
+    var dot = svgEl("circle", { r: 5, fill: "var(--s1)", stroke: "var(--surface)", "stroke-width": 2, visibility: "hidden" });
+    svg.appendChild(cross); svg.appendChild(dot);
+    var hit = svgEl("rect", { x: m.l, y: m.t, width: iw, height: ih, fill: "transparent" });
+    svg.appendChild(hit);
+    function move(ev) {
+      var r = svg.getBoundingClientRect(), px = (ev.clientX - r.left) * W / r.width;
+      var i = points.length === 1 ? 0 : Math.round((px - m.l) / iw * (points.length - 1));
+      i = Math.max(0, Math.min(points.length - 1, i));
+      var p = points[i];
+      cross.setAttribute("x1", x(i)); cross.setAttribute("x2", x(i)); cross.setAttribute("visibility", "visible");
+      dot.setAttribute("cx", x(i)); dot.setAttribute("cy", y(p.net)); dot.setAttribute("visibility", "visible");
+      showTip("<b>" + monthLabel(p.month, true) + "</b><br>Net " + signed(p.net) + "<br>Change " + signed(p.change), ev.clientX, ev.clientY);
+    }
+    hit.addEventListener("pointermove", move);
+    hit.addEventListener("pointerdown", move);
+    hit.addEventListener("pointerleave", function () { cross.setAttribute("visibility", "hidden"); dot.setAttribute("visibility", "hidden"); hideTip(); });
+    host.appendChild(svg);
+  }
+
+  // --- Column chart: electricity cost per month ----------------------------
+  function topRounded(x, y, w, h, r) {
+    r = Math.min(r, w / 2, h);
+    return "M" + x + " " + (y + h) + "V" + (y + r) + "Q" + x + " " + y + " " + (x + r) + " " + y +
+      "H" + (x + w - r) + "Q" + (x + w) + " " + y + " " + (x + w) + " " + (y + r) + "V" + (y + h) + "Z";
+  }
+  function columnChart(host, months) {
+    host.innerHTML = "";
+    if (!months.length) { host.appendChild(el("div", { class: "empty" }, "No full days logged yet.")); return; }
+    var W = host.clientWidth || 600, H = 200, m = { t: 12, r: 8, b: 26, l: 56 };
+    var iw = W - m.l - m.r, ih = H - m.t - m.b;
+    var ticks = niceTicks(0, Math.max.apply(null, months.map(function (p) { return p.cost; })), 4);
+    var top = ticks[ticks.length - 1];
+    var svg = svgEl("svg", { viewBox: "0 0 " + W + " " + H, height: H, role: "img", "aria-label": "Electricity cost by month" });
+    function y(v) { return m.t + ih - v / top * ih; }
+    ticks.forEach(function (t) {
+      svg.appendChild(svgEl("line", { x1: m.l, x2: W - m.r, y1: y(t), y2: y(t), stroke: t === 0 ? "var(--axis)" : "var(--grid)" }));
+      var lab = svgEl("text", { x: m.l - 8, y: y(t) + 4, "text-anchor": "end" });
+      lab.textContent = usd0.format(t);
+      svg.appendChild(lab);
+    });
+    var slot = iw / months.length, bw = Math.max(4, Math.min(40, slot - 4));
+    var every = xLabelEvery(months.length, iw), firstShown = (months.length - 1) % every;
+    months.forEach(function (p, i) {
+      var cx = m.l + slot * i + slot / 2, h = Math.max(0, y(0) - y(p.cost));
+      var bar = svgEl("path", { d: topRounded(cx - bw / 2, y(p.cost), bw, h, 4), fill: "var(--s1)" });
+      var hit = svgEl("rect", { x: m.l + slot * i, y: m.t, width: slot, height: ih, fill: "transparent" });
+      function over(ev) { bar.setAttribute("opacity", "0.8"); showTip("<b>" + monthLabel(p.month, true) + "</b><br>" + money(p.cost) + "<br>" + Math.round(p.kwh).toLocaleString() + " kWh", ev.clientX, ev.clientY); }
+      hit.addEventListener("pointermove", over);
+      hit.addEventListener("pointerdown", over);
+      hit.addEventListener("pointerleave", function () { bar.setAttribute("opacity", "1"); hideTip(); });
+      svg.appendChild(bar);
+      svg.appendChild(hit);
+      if ((months.length - 1 - i) % every === 0) {
+        var lab = svgEl("text", { x: cx, y: H - 6, "text-anchor": "middle" });
+        lab.textContent = monthLabel(p.month, i === firstShown || p.month.slice(5) === "01");
+        svg.appendChild(lab);
+      }
+    });
+    host.appendChild(svg);
+  }
+
+  // --- Horizontal bars -----------------------------------------------------
+  function barRow(value, max, color, tipHtml) {
+    var row = el("div", { class: "bar-row" });
+    var bar = el("div", { class: "bar" });
+    bar.style.width = (max ? value / max * 85 : 0) + "%";
+    bar.style.background = color;
+    if (!value) bar.style.opacity = "0";
+    bar.addEventListener("pointermove", function (ev) { showTip(tipHtml, ev.clientX, ev.clientY); });
+    bar.addEventListener("pointerleave", hideTip);
+    row.appendChild(bar);
+    row.appendChild(el("span", { class: "bar-val" }, value ? money(value) : ""));
+    return row;
+  }
+  function categoryBars(host, cats) {
+    host.innerHTML = "";
+    if (!cats.length) { host.appendChild(el("div", { class: "empty" }, "No entries yet.")); return; }
+    var max = Math.max.apply(null, cats.map(function (c) { return Math.max(c.saved, c.spent); }));
+    cats.forEach(function (c) {
+      host.appendChild(el("div", { class: "name" }, c.category));
+      var pair = el("div", { class: "pair" });
+      pair.appendChild(barRow(c.saved, max, "var(--s1)", "<b>" + esc(c.category) + "</b><br>Saved " + money(c.saved)));
+      pair.appendChild(barRow(c.spent, max, "var(--s2)", "<b>" + esc(c.category) + "</b><br>Spent " + money(c.spent)));
+      host.appendChild(pair);
+    });
+  }
+  function personBars(host, people) {
+    host.innerHTML = "";
+    if (!people.length) { host.appendChild(el("div", { class: "empty" }, "No savings yet.")); return; }
+    var max = Math.max.apply(null, people.map(function (p) { return p.saved; }));
+    people.forEach(function (p) {
+      host.appendChild(el("div", { class: "name" }, p.person));
+      host.appendChild(barRow(p.saved, max, "var(--s1)", "<b>" + esc(p.person) + "</b><br>Saved " + money(p.saved)));
+    });
+  }
+
+  // --- Tables --------------------------------------------------------------
+  function table(host, head, rows, numCols, rowClass) {
+    host.innerHTML = "";
+    var thead = el("thead"), tr = el("tr");
+    head.forEach(function (h, i) { tr.appendChild(el("th", numCols.indexOf(i) >= 0 ? { class: "num" } : {}, h)); });
+    thead.appendChild(tr); host.appendChild(thead);
+    var tbody = el("tbody");
+    rows.forEach(function (r, ri) {
+      var row = el("tr", rowClass && rowClass[ri] ? { class: rowClass[ri] } : {});
+      r.forEach(function (c, i) { row.appendChild(el("td", numCols.indexOf(i) >= 0 ? { class: "num" } : {}, c)); });
+      tbody.appendChild(row);
+    });
+    host.appendChild(tbody);
+  }
+
+  // --- Render --------------------------------------------------------------
+  function render() {
+    var S = R.views[view];
+    document.querySelectorAll(".toggle button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.view === view)); });
+
+    var net = $("net");
+    net.textContent = signed(S.net);
+    net.className = "value " + (S.net >= 0 ? "pos" : "neg");
+    var st = $("net-status");
+    st.textContent = S.net >= 0 ? "▲ Ahead — the rack has paid for itself" : "▼ Behind — the rack has not paid for itself yet";
+    st.className = "status " + (S.net >= 0 ? "pos" : "neg");
+
+    $("saved").textContent = money(S.saved);
+    $("spent").textContent = money(S.spent);
+    $("run-rate").textContent = signed(S.run_rate) + "/mo";
+    if (S.break_even) {
+      $("be-card").classList.remove("hidden");
+      $("be").textContent = dateLabel(S.break_even.date);
+      $("be-note").textContent = "in about " + (Math.round(S.break_even.months * 10) / 10) + " months at this rate";
+    } else if (S.net >= 0) {
+      $("be-card").classList.remove("hidden");
+      $("be").textContent = "Reached";
+      $("be-note").textContent = "net is positive";
+    } else {
+      $("be-card").classList.add("hidden");
+    }
+
+    lineChart($("net-chart"), S.timeline);
+    table($("net-table"), ["Month", "Change", "Cumulative net"],
+      S.timeline.map(function (p) { return [monthLabel(p.month, true), signed(p.change), signed(p.net)]; }), [1, 2]);
+
+    categoryBars($("cat-bars"), S.by_category);
+    $("person-panel").classList.toggle("hidden", view !== "everyone");
+    personBars($("person-bars"), S.by_person);
+
+    var E = R.electricity;
+    if (E.available) {
+      $("elec-body").classList.remove("hidden");
+      $("elec-sub").textContent = "Estimated from logged average-watt readings since " + dateLabel(E.start_date) + ". Counted in both views.";
+      $("watts").textContent = Math.round(E.current_watts) + " W";
+      $("rate").textContent = "$" + E.current_rate.toFixed(4).replace(/0+$/, "").replace(/\.$/, "") + "/kWh";
+      $("elec-month").textContent = money(E.current_month_cost);
+      $("elec-total").textContent = money(E.total_cost);
+      columnChart($("elec-chart"), E.months);
+      table($("elec-table"), ["Month", "kWh", "Cost"],
+        E.months.map(function (p) { return [monthLabel(p.month, true), Math.round(p.kwh).toLocaleString(), money(p.cost)]; }), [1, 2]);
+    } else {
+      $("elec-body").classList.add("hidden");
+      $("elec-sub").textContent = "No power readings or utility rate logged yet.";
+    }
+
+    var rows = S.entries;
+    if (!rows.length) {
+      $("entries").innerHTML = "";
+      $("entries").appendChild(el("caption", { class: "empty" }, "No entries yet."));
+    } else {
+      table($("entries"), ["Name", "Type", "Category", "For", "Amount", "Since", "Ends", "To date"],
+        rows.map(function (r) {
+          return [
+            r.name,
+            (r.direction === "savings" ? "Saving" : "Expense") + " · " + (r.frequency === "monthly" ? "monthly" : "one-time"),
+            r.category,
+            r.beneficiary,
+            money(r.amount) + (r.frequency === "monthly" ? "/mo" : ""),
+            dateLabel(r.start_date),
+            r.frequency === "monthly" ? (r.end_date ? dateLabel(r.end_date) : "ongoing") : "",
+            signed(r.to_date)
+          ];
+        }), [4, 7],
+        rows.map(function (r) { return r.frequency === "monthly" && !r.active ? "ended" : ""; }));
+    }
+
+    $("updated").textContent = "Last updated " + new Date(R.generated_at).toLocaleString() + " · totals as of " + dateLabel(R.today);
+  }
+
+  document.querySelectorAll(".toggle button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      view = b.dataset.view;
+      try { localStorage.setItem("view", view); } catch (e) {}
+      render();
+    });
+  });
+  var resizeTimer;
+  window.addEventListener("resize", function () { clearTimeout(resizeTimer); resizeTimer = setTimeout(render, 150); });
+  render();
+})();
+</script>
+</body>
+</html>

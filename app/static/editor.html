@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Savings Editor</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --border: rgba(11,11,11,0.12); --accent: #2a78d6; --accent-ink: #ffffff;
+  --good: #006300; --bad: #d03b3b; --wash: rgba(42,120,214,0.08); --warn-bg: #fff4d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --border: rgba(255,255,255,0.12); --accent: #3987e5; --accent-ink: #ffffff;
+    --good: #0ca30c; --bad: #e66767; --wash: rgba(57,135,229,0.12); --warn-bg: #3a2f10;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --border: rgba(255,255,255,0.12); --accent: #3987e5; --accent-ink: #ffffff;
+  --good: #0ca30c; --bad: #e66767; --wash: rgba(57,135,229,0.12); --warn-bg: #3a2f10;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 1100px; margin: 0 auto; padding: 16px 16px 64px; }
+.topbar {
+  position: sticky; top: 0; z-index: 5; background: var(--page); border-bottom: 1px solid var(--grid);
+  display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; padding: 12px 16px;
+}
+.topbar h1 { font-size: 16px; margin: 0; }
+.topbar .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.badge { font-size: 12px; padding: 3px 8px; border-radius: 999px; background: var(--wash); color: var(--ink-2); }
+.badge.dirty { background: var(--warn-bg); color: var(--ink); }
+.summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin: 16px 0; }
+.summary > div { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+.summary .label { color: var(--ink-2); font-size: 12px; }
+.summary .value { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.pos { color: var(--good); } .neg { color: var(--bad); }
+section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+h2 { font-size: 15px; margin: 0 0 12px; }
+h3 { font-size: 13px; margin: 16px 0 8px; color: var(--ink-2); }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px 12px; }
+label { display: grid; gap: 4px; font-size: 12px; color: var(--ink-2); }
+label.wide { grid-column: 1 / -1; }
+input, select, textarea, button { font: inherit; }
+input, select, textarea {
+  width: 100%; padding: 7px 9px; border: 1px solid var(--border); border-radius: 7px;
+  background: var(--page); color: var(--ink);
+}
+textarea { min-height: 70px; resize: vertical; }
+button {
+  border: 1px solid var(--border); background: var(--surface); color: var(--ink);
+  padding: 7px 12px; border-radius: 7px; cursor: pointer;
+}
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 600; }
+button.link { border: 0; background: none; color: var(--accent); padding: 2px 4px; }
+button.danger { color: var(--bad); }
+button:disabled { opacity: 0.5; cursor: default; }
+a.button { text-decoration: none; color: var(--ink); border: 1px solid var(--border); padding: 7px 12px; border-radius: 7px; background: var(--surface); }
+.row-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; padding: 6px 12px; background: var(--page); }
+.seg button[aria-pressed="true"] { background: var(--wash); font-weight: 600; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--grid); white-space: nowrap; vertical-align: top; }
+th { color: var(--ink-2); font-size: 12px; font-weight: 600; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.notes { white-space: normal; color: var(--muted); max-width: 260px; }
+tr.ended td { color: var(--muted); }
+tr.editing td { background: var(--wash); }
+.empty { color: var(--muted); padding: 8px 0; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+details summary { cursor: pointer; color: var(--ink-2); font-size: 13px; margin-bottom: 8px; }
+#toast {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 20; display: none;
+  background: var(--ink); color: var(--page); padding: 10px 14px; border-radius: 8px; max-width: calc(100% - 32px);
+}
+#toast.error { background: var(--bad); color: #fff; }
+.hint { color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>Savings Editor</h1>
+  <div class="actions">
+    <span class="badge" id="pub-status">Loading…</span>
+    <a class="button" href="/preview" target="_blank" rel="noopener">Preview</a>
+    <button class="primary" id="publish">Publish</button>
+  </div>
+</div>
+<main>
+  <div class="summary">
+    <div><div class="label">Net (Me)</div><div class="value" id="s-net-me"></div></div>
+    <div><div class="label">Net (Everyone)</div><div class="value" id="s-net-all"></div></div>
+    <div><div class="label">Run rate (Me)</div><div class="value" id="s-rate"></div></div>
+    <div><div class="label">Break-even (Me)</div><div class="value" id="s-be"></div></div>
+  </div>
+
+  <section id="entry-section">
+    <h2 id="form-title">Add entry</h2>
+    <details>
+      <summary>Paste entry JSON (e.g. from Claude)</summary>
+      <textarea id="paste" placeholder='{"name": "Apple TV+", "direction": "savings", "frequency": "monthly", "amount": 10.74, "start_date": "2026-01-04", ...}'></textarea>
+      <div class="row-actions"><button id="paste-fill">Fill form</button><span class="hint">Fills the form below. Nothing is saved until you click Save.</span></div>
+    </details>
+    <form id="entry-form" autocomplete="off">
+      <div class="grid">
+        <label class="wide">Name<input name="name" required maxlength="120" placeholder="Apple TV+ cancelled"></label>
+        <label>Direction
+          <select name="direction"><option value="savings">Saving</option><option value="expense">Expense</option></select>
+        </label>
+        <label>Frequency
+          <select name="frequency"><option value="monthly">Monthly</option><option value="one_time">One-time</option></select>
+        </label>
+        <label>Amount (USD)<input name="amount" type="number" step="0.01" min="0.01" required inputmode="decimal"></label>
+        <label><span id="start-label">Start date</span><input name="start_date" type="date" required></label>
+        <label id="end-wrap">End date (blank = ongoing)<input name="end_date" type="date"></label>
+        <label>Category<select name="category"></select></label>
+        <label>For<select name="beneficiary"></select></label>
+        <label class="wide">Notes (hidden on the public page)<textarea name="notes" maxlength="2000"></textarea></label>
+      </div>
+      <div class="row-actions">
+        <button class="primary" type="submit" id="save">Save</button>
+        <button type="button" id="cancel-edit" hidden>Cancel edit</button>
+      </div>
+    </form>
+  </section>
+
+  <section>
+    <h2>Entries</h2>
+    <div class="table-wrap"><table id="entries"></table></div>
+  </section>
+
+  <section>
+    <h2>Electricity</h2>
+    <div class="cols">
+      <div>
+        <h3>Log power reading</h3>
+        <form id="reading-form" class="grid">
+          <label>Date<input name="date" type="date"></label>
+          <label>Average watts<input name="watts" type="number" step="1" min="1" required inputmode="numeric"></label>
+          <label class="wide">Note<input name="note" maxlength="500" placeholder="added the Unraid server"></label>
+          <div><button class="primary" type="submit">Add reading</button></div>
+        </form>
+        <div class="table-wrap"><table id="readings"></table></div>
+      </div>
+      <div>
+        <h3>Utility rate</h3>
+        <form id="rate-form" class="grid">
+          <label>Effective date<input name="effective_date" type="date" required></label>
+          <label>$/kWh<input name="rate_per_kwh" type="number" step="0.0001" min="0.0001" required inputmode="decimal"></label>
+          <div><button class="primary" type="submit">Add rate</button></div>
+        </form>
+        <p class="hint">A rate change is a new row, not an edit.</p>
+        <div class="table-wrap"><table id="rates"></table></div>
+        <h3>Rack online since</h3>
+        <form id="settings-form" class="grid">
+          <label>Date<input name="rack_online_since" type="date"></label>
+          <div style="align-self:end"><button type="submit">Save</button></div>
+        </form>
+        <p class="hint">The first reading is carried back to this date. Blank = start at the first reading.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Lists</h2>
+    <form id="lists-form" class="cols">
+      <label>Categories (one per line)<textarea name="categories" rows="6"></textarea></label>
+      <label>People (one per line; keep “Me”)<textarea name="people" rows="6"></textarea></label>
+      <div><button type="submit">Save lists</button></div>
+    </form>
+  </section>
+</main>
+<div id="toast" role="status"></div>
+
+<script>
+(function () {
+  "use strict";
+  var data = null, status = null, editingId = null;
+  var usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+  function $(id) { return document.getElementById(id); }
+  function signed(v) { return (v > 0 ? "+" : v < 0 ? "−" : "") + usd.format(Math.abs(v)); }
+  function localToday() {
+    var d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+
+  var toastTimer;
+  function toast(msg, isError) {
+    var t = $("toast");
+    t.textContent = msg;
+    t.className = isError ? "error" : "";
+    t.style.display = "block";
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.style.display = "none"; }, isError ? 6000 : 2500);
+  }
+
+  function api(method, url, body) {
+    return fetch(url, {
+      method: method,
+      headers: body ? { "Content-Type": "application/json" } : {},
+      body: body ? JSON.stringify(body) : undefined
+    }).then(function (r) {
+      if (r.status === 204) return null;
+      return r.json().then(function (j) {
+        if (!r.ok) {
+          var msg = j.detail;
+          if (Array.isArray(msg)) msg = msg.map(function (d) { return (d.loc || []).slice(-1)[0] + ": " + d.msg; }).join("; ");
+          throw new Error(msg || r.statusText);
+        }
+        return j;
+      });
+    });
+  }
+
+  function refresh() {
+    return Promise.all([api("GET", "/api/data"), api("GET", "/api/status")]).then(function (res) {
+      data = res[0]; status = res[1];
+      render();
+    }).catch(function (e) { toast(e.message, true); });
+  }
+
+  function run(promise, okMsg) {
+    return promise.then(function () { if (okMsg) toast(okMsg); return refresh(); })
+      .catch(function (e) { toast(e.message, true); throw e; });
+  }
+
+  // --- Rendering -----------------------------------------------------------
+  function cell(tr, text, cls) {
+    var td = document.createElement("td");
+    if (cls) td.className = cls;
+    if (text instanceof Node) td.appendChild(text); else td.textContent = text == null ? "" : text;
+    tr.appendChild(td);
+    return td;
+  }
+  function header(table, cols, numIdx) {
+    table.innerHTML = "";
+    var tr = document.createElement("tr");
+    cols.forEach(function (c, i) {
+      var th = document.createElement("th");
+      th.textContent = c;
+      if ((numIdx || []).indexOf(i) >= 0) th.className = "num";
+      tr.appendChild(th);
+    });
+    var thead = document.createElement("thead");
+    thead.appendChild(tr);
+    table.appendChild(thead);
+    var tbody = document.createElement("tbody");
+    table.appendChild(tbody);
+    return tbody;
+  }
+  function btn(label, cls, onClick) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "link " + (cls || "");
+    b.textContent = label;
+    b.addEventListener("click", onClick);
+    return b;
+  }
+  function options(select, values, selected) {
+    select.innerHTML = "";
+    values.forEach(function (v) {
+      var o = document.createElement("option");
+      o.value = o.textContent = v;
+      select.appendChild(o);
+    });
+    if (selected != null) select.value = selected;
+  }
+
+  function render() {
+    var badge = $("pub-status");
+    if (!status.published_at) { badge.textContent = "Never published"; badge.className = "badge dirty"; }
+    else if (status.unpublished_changes) { badge.textContent = "Unpublished changes"; badge.className = "badge dirty"; }
+    else { badge.textContent = "Published " + new Date(status.published_at).toLocaleString(); badge.className = "badge"; }
+
+    var me = status.summary.me, all = status.summary.everyone;
+    $("s-net-me").textContent = signed(me.net); $("s-net-me").className = "value " + (me.net >= 0 ? "pos" : "neg");
+    $("s-net-all").textContent = signed(all.net); $("s-net-all").className = "value " + (all.net >= 0 ? "pos" : "neg");
+    $("s-rate").textContent = signed(me.run_rate) + "/mo";
+    $("s-be").textContent = me.break_even ? me.break_even.date : (me.net >= 0 ? "Reached" : "—");
+
+    var form = $("entry-form");
+    options(form.category, data.categories, form.category.value || data.categories[0]);
+    options(form.beneficiary, data.people, form.beneficiary.value || "Me");
+
+    renderEntries();
+    renderElectricity();
+    var lists = $("lists-form");
+    if (document.activeElement !== lists.categories) lists.categories.value = data.categories.join("\n");
+    if (document.activeElement !== lists.people) lists.people.value = data.people.join("\n");
+  }
+
+  function renderEntries() {
+    var table = $("entries");
+    var rows = data.entries.slice().sort(function (a, b) { return a.start_date < b.start_date ? 1 : a.start_date > b.start_date ? -1 : 0; });
+    var tbody = header(table, ["Name", "Type", "Category", "For", "Amount", "Start", "End", "To date", "Notes", ""], [4, 7]);
+    if (!rows.length) {
+      var tr = document.createElement("tr"); var td = cell(tr, "No entries yet. Add one above.", "empty"); td.colSpan = 10; tbody.appendChild(tr);
+      return;
+    }
+    var t = status.today;
+    rows.forEach(function (e) {
+      var tr = document.createElement("tr");
+      var ended = e.frequency === "monthly" && e.end_date && e.end_date < t;
+      if (ended) tr.className = "ended";
+      if (e.id === editingId) tr.className = "editing";
+      cell(tr, e.name);
+      cell(tr, (e.direction === "savings" ? "Saving" : "Expense") + " · " + (e.frequency === "monthly" ? "monthly" : "one-time"));
+      cell(tr, e.category);
+      cell(tr, e.beneficiary);
+      cell(tr, usd.format(e.amount) + (e.frequency === "monthly" ? "/mo" : ""), "num");
+      cell(tr, e.start_date);
+      cell(tr, e.frequency === "monthly" ? (e.end_date || "ongoing") : "");
+      cell(tr, signed(status.to_date[e.id] || 0), "num");
+      cell(tr, e.notes || "", "notes");
+      var actions = document.createElement("span");
+      actions.appendChild(btn("Edit", "", function () { startEdit(e); }));
+      if (e.frequency === "monthly" && !e.end_date) {
+        actions.appendChild(btn("End", "", function () {
+          var when = prompt("End “" + e.name + "” on (YYYY-MM-DD):", t);
+          if (!when) return;
+          run(api("POST", "/api/entries/" + e.id + "/end", { end_date: when }), "Entry ended");
+        }));
+      }
+      actions.appendChild(btn("Delete", "danger", function () {
+        if (!confirm("Delete “" + e.name + "”? This removes it from all totals.")) return;
+        run(api("DELETE", "/api/entries/" + e.id), "Entry deleted").then(function () { if (editingId === e.id) resetForm(); });
+      }));
+      cell(tr, actions);
+      tbody.appendChild(tr);
+    });
+  }
+
+  function renderElectricity() {
+    var tbody = header($("readings"), ["Date", "Watts", "Note", ""], [1]);
+    data.power_readings.slice().reverse().forEach(function (r) {
+      var tr = document.createElement("tr");
+      cell(tr, r.date); cell(tr, Math.round(r.watts) + " W", "num"); cell(tr, r.note || "", "notes");
+      cell(tr, btn("Delete", "danger", function () {
+        if (confirm("Delete the " + r.date + " reading?")) run(api("DELETE", "/api/readings/" + r.id), "Reading deleted");
+      }));
+      tbody.appendChild(tr);
+    });
+    if (!data.power_readings.length) { var tr = document.createElement("tr"); var td = cell(tr, "No readings yet.", "empty"); td.colSpan = 4; tbody.appendChild(tr); }
+
+    tbody = header($("rates"), ["Effective", "$/kWh", ""], [1]);
+    data.rates.slice().reverse().forEach(function (r) {
+      var tr = document.createElement("tr");
+      cell(tr, r.effective_date); cell(tr, "$" + r.rate_per_kwh, "num");
+      cell(tr, btn("Delete", "danger", function () {
+        if (confirm("Delete the rate effective " + r.effective_date + "?")) run(api("DELETE", "/api/rates/" + r.id), "Rate deleted");
+      }));
+      tbody.appendChild(tr);
+    });
+    if (!data.rates.length) { var tr2 = document.createElement("tr"); var td2 = cell(tr2, "No rate yet.", "empty"); td2.colSpan = 3; tbody.appendChild(tr2); }
+
+    var s = $("settings-form").rack_online_since;
+    if (document.activeElement !== s) s.value = data.settings.rack_online_since || "";
+  }
+
+  // --- Entry form ----------------------------------------------------------
+  var form = $("entry-form");
+  function syncFrequency() {
+    var monthly = form.frequency.value === "monthly";
+    $("end-wrap").style.display = monthly ? "" : "none";
+    $("start-label").textContent = monthly ? "Start date" : "Date";
+    if (!monthly) form.end_date.value = "";
+  }
+  function fill(e) {
+    ["name", "direction", "frequency", "amount", "start_date", "end_date", "notes"].forEach(function (k) {
+      if (e[k] !== undefined) form[k].value = e[k] == null ? "" : e[k];
+    });
+    if (e.category !== undefined) {
+      if (data.categories.indexOf(e.category) < 0) toast("Category “" + e.category + "” isn't in your list. Add it under Lists or pick another.", true);
+      else form.category.value = e.category;
+    }
+    if (e.beneficiary !== undefined) {
+      if (data.people.indexOf(e.beneficiary) < 0) toast("Person “" + e.beneficiary + "” isn't in your list. Add them under Lists first.", true);
+      else form.beneficiary.value = e.beneficiary;
+    }
+    syncFrequency();
+  }
+  function startEdit(e) {
+    editingId = e.id;
+    fill(e);
+    $("form-title").textContent = "Edit entry";
+    $("save").textContent = "Save changes";
+    $("cancel-edit").hidden = false;
+    renderEntries();
+    $("entry-section").scrollIntoView({ behavior: "smooth" });
+  }
+  function resetForm() {
+    editingId = null;
+    form.reset();
+    form.start_date.value = localToday();
+    form.beneficiary.value = "Me";
+    $("form-title").textContent = "Add entry";
+    $("save").textContent = "Save";
+    $("cancel-edit").hidden = true;
+    syncFrequency();
+    if (data) renderEntries();
+  }
+  form.frequency.addEventListener("change", syncFrequency);
+  $("cancel-edit").addEventListener("click", resetForm);
+  form.addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var body = {
+      name: form.name.value,
+      direction: form.direction.value,
+      frequency: form.frequency.value,
+      amount: parseFloat(form.amount.value),
+      start_date: form.start_date.value,
+      end_date: form.end_date.value || null,
+      category: form.category.value,
+      beneficiary: form.beneficiary.value,
+      notes: form.notes.value || null
+    };
+    var req = editingId ? api("PUT", "/api/entries/" + editingId, body) : api("POST", "/api/entries", body);
+    run(req, editingId ? "Entry updated" : "Entry added").then(resetForm, function () {});
+  });
+  $("paste-fill").addEventListener("click", function () {
+    var raw = $("paste").value.trim();
+    if (!raw) return;
+    try {
+      var obj = JSON.parse(raw);
+      if (Array.isArray(obj)) obj = obj[0];
+      resetForm();
+      fill(obj);
+      toast("Form filled. Check it, then Save.");
+    } catch (e) { toast("That isn't valid JSON: " + e.message, true); }
+  });
+
+  // --- Electricity / lists / publish --------------------------------------
+  $("reading-form").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var f = ev.target;
+    run(api("POST", "/api/readings", { date: f.date.value || null, watts: parseFloat(f.watts.value), note: f.note.value || null }), "Reading added")
+      .then(function () { f.watts.value = ""; f.note.value = ""; f.date.value = localToday(); }, function () {});
+  });
+  $("rate-form").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var f = ev.target;
+    run(api("POST", "/api/rates", { effective_date: f.effective_date.value, rate_per_kwh: parseFloat(f.rate_per_kwh.value) }), "Rate added")
+      .then(function () { f.reset(); }, function () {});
+  });
+  $("settings-form").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    run(api("PUT", "/api/settings", { rack_online_since: ev.target.rack_online_since.value || null }), "Saved").catch(function () {});
+  });
+  $("lists-form").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var f = ev.target;
+    function lines(s) { return s.split("\n").map(function (x) { return x.trim(); }).filter(Boolean); }
+    run(api("PUT", "/api/lists", { categories: lines(f.categories.value), people: lines(f.people.value) }), "Lists saved").catch(function () {});
+  });
+  $("publish").addEventListener("click", function () {
+    var b = $("publish");
+    b.disabled = true;
+    run(api("POST", "/api/publish"), "Published").catch(function () {}).then(function () { b.disabled = false; });
+  });
+
+  $("reading-form").date.value = localToday();
+  form.start_date.value = localToday();
+  syncFrequency();
+  refresh();
+})();
+</script>
+</body>
+</html>

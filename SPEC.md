@@ -1,4 +1,4 @@
-# Homelab Savings Report — Spec v1.1
+# Homelab Savings Report — Spec v1.2
 
 Oct 11, 2026 · David Gascon
 
@@ -27,7 +27,7 @@ One host serves two ports: the admin editor on a LAN-only port, and the static p
 ```
             LAN only                                   public
   ┌──────────────────────────┐              ┌──────────────────────────┐
-  │ Admin editor (admin port)│   Publish    │ Static server (pub port) │
+  │ Admin editor (8086)      │   Publish    │ Static server (8085)     │
   │  - reads/writes          │ ───────────▶ │  - serves index.html     │
   │    entries.json          │  writes one  │    only                  │
   │  - Preview               │  HTML file   │                          │
@@ -35,7 +35,7 @@ One host serves two ports: the admin editor on a LAN-only port, and the static p
         ▲ firewall: allow from LAN only           ▲ firewall: forward from WAN
 ```
 
-Publishing writes one self-contained HTML file into the folder the public port serves. The public port serves only that file, never entries.json or the editor. The firewall forwards the public port from outside and allows the admin port from the LAN only. Proposed: both pieces run as Docker containers in Portainer (see open questions).
+Publishing writes one self-contained HTML file into the folder the public port serves. The public port serves only that file, never entries.json or the editor. The firewall forwards the public port from outside and allows the admin port from the LAN only. Both pieces run as one Docker Compose stack on the Ubuntu server, deployed through Portainer: a Python/FastAPI editor on port 8086 (LAN only) and an nginx static server on port 8085 (public).
 
 ## Data model
 
@@ -134,8 +134,8 @@ Natural-language entry, like "cancelling Apple TV, saving 10.74 a month since 1/
 
 - [ ] Does "statistics about my server" mean financial stats only, or also live server stats like uptime and storage?
 - [ ] Should the public page show dollar amounts, or only percentages and trends?
-- [ ] Editor stack: plain HTML + small Python/Node API in Docker, or something already running?
-- [ ] Port numbers for the public page and the admin editor
+- [x] Editor stack: decided in v1.2 (Python/FastAPI editor + nginx static server, Docker Compose via Portainer)
+- [x] Port numbers: decided in v1.2 (public 8085, admin 8086)
 - [ ] In the Me view, should an expense bought for someone else count against me? Draft assumes yes.
 - [ ] Utility rate in $/kWh, and does it vary by season or tier?
 - [ ] Rack-online date for the start of electricity history
@@ -147,5 +147,6 @@ Every change to scope, rules, or architecture gets a row here, newest first, wit
 
 | Date | Version | Decision |
 | --- | --- | --- |
+| 2026-10-11 | v1.2 | Stack: Python/FastAPI editor + nginx static server in one Docker Compose stack on Ubuntu, deployed via Portainer. Ports: public 8085, admin 8086 (LAN only) |
 | 2026-10-11 | v1.1 | Dropped the DMZ design: one host, public page on its own port, admin port LAN-only. Added categories, beneficiary (default Me) with Me/Everyone views, and electricity from watt readings |
 | 2026-10-11 | v1 | Initial spec: static public page, LAN editor, JSON storage, one-time and monthly entries, accrual computed at build time |

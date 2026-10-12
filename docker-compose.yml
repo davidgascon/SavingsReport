@@ -1,0 +1,30 @@
+name: savings-report
+
+services:
+  editor:
+    build: .
+    image: savings-report-editor:latest
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-UTC}  # set to your zone, e.g. America/New_York, so "today" rolls over at local midnight
+    ports:
+      # LAN only. Docker publishes ports past ufw, so also keep 8086 un-forwarded in OPNsense,
+      # or set ADMIN_BIND to the server's LAN IP to bind just that interface.
+      - "${ADMIN_BIND:-0.0.0.0}:8086:8000"
+    volumes:
+      - ${DATA_PATH:-/opt/savings-report/data}:/data
+      - site:/site
+
+  public:
+    build: ./public
+    image: savings-report-public:latest
+    restart: unless-stopped
+    ports:
+      - "8085:80"
+    volumes:
+      - site:/site:ro
+    depends_on:
+      - editor
+
+volumes:
+  site:
