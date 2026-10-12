@@ -1,9 +1,10 @@
+# Prebuilt images from GitHub Actions (.github/workflows/images.yml); nothing is built on the server.
+# To build locally instead: docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 name: savings-report
 
 services:
   editor:
-    build: .
-    image: savings-report-editor:latest
+    image: ghcr.io/davidgascon/savingsreport-editor:latest
     restart: unless-stopped
     environment:
       TZ: ${TZ:-America/Los_Angeles}  # Pacific (WA); "today" rolls over at local midnight
@@ -18,8 +19,7 @@ services:
       - ./site:/site
 
   public:
-    build: ./public
-    image: savings-report-public:latest
+    image: ghcr.io/davidgascon/savingsreport-public:latest
     restart: unless-stopped
     ports:
       - "8085:80"

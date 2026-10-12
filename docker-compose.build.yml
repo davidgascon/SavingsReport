@@ -1,0 +1,6 @@
+# Override for building the images from source instead of pulling them from GHCR.
+services:
+  editor:
+    build: .
+  public:
+    build: ./public
