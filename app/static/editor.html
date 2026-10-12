@@ -1,9 +1,13 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Savings Editor</title>
+<script>
+  // Dark by default; a saved "light" choice wins.
+  try { if (localStorage.getItem("theme") === "light") document.documentElement.setAttribute("data-theme", "light"); } catch (e) {}
+</script>
 <style>
 :root {
   color-scheme: light;
@@ -90,6 +94,7 @@ details summary { cursor: pointer; color: var(--ink-2); font-size: 13px; margin-
   <h1>Savings Editor</h1>
   <div class="actions">
     <span class="badge" id="pub-status">Loading…</span>
+    <button type="button" id="theme"></button>
     <a class="button" href="/preview" target="_blank" rel="noopener">Preview</a>
     <button class="primary" id="publish">Publish</button>
   </div>
@@ -465,6 +470,24 @@ details summary { cursor: pointer; color: var(--ink-2); font-size: 13px; margin-
     b.disabled = true;
     run(api("POST", "/api/publish"), "Published").catch(function () {}).then(function () { b.disabled = false; });
   });
+
+
+  // --- Theme toggle (dark default) -----------------------------------------
+  (function () {
+    var root = document.documentElement, b = document.getElementById("theme");
+    function sync() {
+      var dark = root.getAttribute("data-theme") !== "light";
+      b.textContent = dark ? "☀ Light" : "☾ Dark";
+      b.setAttribute("aria-label", dark ? "Switch to light mode" : "Switch to dark mode");
+    }
+    b.addEventListener("click", function () {
+      var next = root.getAttribute("data-theme") === "light" ? "dark" : "light";
+      root.setAttribute("data-theme", next);
+      try { localStorage.setItem("theme", next); } catch (e) {}
+      sync();
+    });
+    sync();
+  })();
 
   $("reading-form").date.value = localToday();
   form.start_date.value = localToday();

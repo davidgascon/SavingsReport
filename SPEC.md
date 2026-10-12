@@ -1,4 +1,4 @@
-# Homelab Savings Report — Spec v1.3
+# Homelab Savings Report — Spec v1.4
 
 Oct 11, 2026 · David Gascon
 
@@ -113,7 +113,7 @@ The public page leads with one big number, the net position, colored green when 
 - **Entry list:** read-only table of entries with category, person, and to-date totals; notes hidden on the public page
 - **Footer:** "last updated" timestamp from the build
 
-The page is one self-contained HTML file with inline CSS and JS, and no calls back to the LAN. It must read well on a phone.
+The page is one self-contained HTML file with inline CSS and JS, and no calls back to the LAN. It must read well on a phone. It opens in dark mode regardless of the device setting, with a light toggle the viewer's browser remembers; the editor does the same.
 
 ## Editor features (LAN only)
 
@@ -147,6 +147,7 @@ Every change to scope, rules, or architecture gets a row here, newest first, wit
 
 | Date | Version | Decision |
 | --- | --- | --- |
+| 2026-10-11 | v1.4 | Dark mode is the default on the public page and editor, with a light toggle remembered per browser |
 | 2026-10-11 | v1.3 | Publish freezes a data snapshot; page re-renders daily from it. Electricity counts whole days to yesterday; earliest rate back-fills. Break-even date = whole months + leftover days. "Me" is permanent; list values in use can't be removed |
 | 2026-10-11 | v1.2 | Stack: Python/FastAPI editor + nginx static server in one Docker Compose stack on Ubuntu, deployed via Portainer. Ports: public 8085, admin 8086 (LAN only) |
 | 2026-10-11 | v1.1 | Dropped the DMZ design: one host, public page on its own port, admin port LAN-only. Added categories, beneficiary (default Me) with Me/Everyone views, and electricity from watt readings |

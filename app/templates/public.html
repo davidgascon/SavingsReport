@@ -1,10 +1,14 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>Homelab Savings</title>
+<script>
+  // Dark by default; a saved "light" choice wins.
+  try { if (localStorage.getItem("theme") === "light") document.documentElement.setAttribute("data-theme", "light"); } catch (e) {}
+</script>
 <style>
 :root {
   color-scheme: light;
@@ -52,6 +56,11 @@ body {
   font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 main { max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; }
+.header-actions { display: flex; gap: 8px; align-items: center; }
+.theme-btn {
+  border: 1px solid var(--border); background: var(--surface); color: var(--ink-2); font: inherit; font-size: 13px;
+  padding: 7px 12px; border-radius: 8px; cursor: pointer;
+}
 header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
 h1 { font-size: 18px; margin: 0; font-weight: 600; }
 h2 { font-size: 15px; margin: 0 0 4px; font-weight: 600; }
@@ -115,9 +124,12 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
   <!--PREVIEW_BANNER-->
   <header>
     <h1>Homelab Savings Report</h1>
-    <div class="toggle" role="group" aria-label="View">
-      <button type="button" data-view="me" aria-pressed="true">Me</button>
-      <button type="button" data-view="everyone" aria-pressed="false">Everyone</button>
+    <div class="header-actions">
+      <div class="toggle" role="group" aria-label="View">
+        <button type="button" data-view="me" aria-pressed="true">Me</button>
+        <button type="button" data-view="everyone" aria-pressed="false">Everyone</button>
+      </div>
+      <button type="button" class="theme-btn" id="theme"></button>
     </div>
   </header>
 
@@ -467,6 +479,23 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
       render();
     });
   });
+
+  // --- Theme toggle (dark default) -----------------------------------------
+  (function () {
+    var root = document.documentElement, b = document.getElementById("theme");
+    function sync() {
+      var dark = root.getAttribute("data-theme") !== "light";
+      b.textContent = dark ? "☀ Light" : "☾ Dark";
+      b.setAttribute("aria-label", dark ? "Switch to light mode" : "Switch to dark mode");
+    }
+    b.addEventListener("click", function () {
+      var next = root.getAttribute("data-theme") === "light" ? "dark" : "light";
+      root.setAttribute("data-theme", next);
+      try { localStorage.setItem("theme", next); } catch (e) {}
+      sync();
+    });
+    sync();
+  })();
   var resizeTimer;
   window.addEventListener("resize", function () { clearTimeout(resizeTimer); resizeTimer = setTimeout(render, 150); });
   render();
