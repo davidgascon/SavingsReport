@@ -1,4 +1,4 @@
-# Homelab Savings Report — Spec v1.2
+# Homelab Savings Report — Spec v1.3
 
 Oct 11, 2026 · David Gascon
 
@@ -35,7 +35,7 @@ One host serves two ports: the admin editor on a LAN-only port, and the static p
         ▲ firewall: allow from LAN only           ▲ firewall: forward from WAN
 ```
 
-Publishing writes one self-contained HTML file into the folder the public port serves. The public port serves only that file, never entries.json or the editor. The firewall forwards the public port from outside and allows the admin port from the LAN only. Both pieces run as one Docker Compose stack on the Ubuntu server, deployed through Portainer: a Python/FastAPI editor on port 8086 (LAN only) and an nginx static server on port 8085 (public).
+Publishing writes one self-contained HTML file into the folder the public port serves. The public port serves only that file, never entries.json or the editor. The firewall forwards the public port from outside and allows the admin port from the LAN only. Both pieces run as one Docker Compose stack on the Ubuntu server, deployed through Portainer: a Python/FastAPI editor on port 8086 (LAN only) and an nginx static server on port 8085 (public). Publish freezes a copy of the data (published.json); the page re-renders daily from that copy so totals keep accruing and unpublished edits never go public.
 
 ## Data model
 
@@ -78,7 +78,7 @@ All totals are computed at build time from the entry list; nothing accrued is st
    1. **Me:** only entries with beneficiary Me, plus all expenses and electricity.
    2. **Everyone:** all entries, so savings by other people count toward the rack.
 6. **Monthly run rate** = active monthly savings − active monthly expenses − current monthly electricity cost, where active means started and not ended.
-7. **Break-even estimate** applies only when net is negative and run rate is positive: months to break even = −net ÷ run rate, shown as a projected date, per view.
+7. **Break-even estimate** applies only when net is negative and run rate is positive: months to break even = −net ÷ run rate, shown as a projected date, per view. The date is today plus the whole months, then the leftover fraction as days.
 
 Amounts are rounded to cents only for display; sums use full precision.
 
@@ -97,7 +97,7 @@ kWh  = watts × hours / 1000
 cost = kWh × rate
 ```
 
-Worked example: 350 W over a 30-day month = 350 × 720 ÷ 1000 = 252 kWh, then × your rate. Costs are computed per calendar month, so the chart and the monthly run rate use the same numbers.
+Worked example: 350 W over a 30-day month = 350 × 720 ÷ 1000 = 252 kWh, then × your rate. Costs are computed per calendar month, so the chart and the monthly run rate use the same numbers. Whole days are counted up to yesterday. Rates back-fill like readings: the earliest rate is carried back to the rack-online date.
 
 The estimate gets more accurate as readings are logged after hardware changes. Pulling watts automatically from a UPS or smart plug is a v2 candidate.
 
@@ -123,7 +123,7 @@ The editor is a small web app reachable only from the trusted network. It owns t
 - **End entry:** one click to set end_date on a monthly entry, such as re-subscribing to something
 - **Edit and delete:** fix typos or remove mistakes
 - **Log power reading:** date (defaults to today) and average watts; plus the utility rate and rack-online date as settings
-- **Manage lists:** categories and people
+- **Manage lists:** categories and people. "Me" is permanent, and a value used by an entry can't be removed
 - **Preview:** shows the same view as the public page before publishing
 - **Publish:** rebuilds the static HTML into the public port's folder
 - **Backup:** the JSON file is included in existing backups
@@ -147,6 +147,7 @@ Every change to scope, rules, or architecture gets a row here, newest first, wit
 
 | Date | Version | Decision |
 | --- | --- | --- |
+| 2026-10-11 | v1.3 | Publish freezes a data snapshot; page re-renders daily from it. Electricity counts whole days to yesterday; earliest rate back-fills. Break-even date = whole months + leftover days. "Me" is permanent; list values in use can't be removed |
 | 2026-10-11 | v1.2 | Stack: Python/FastAPI editor + nginx static server in one Docker Compose stack on Ubuntu, deployed via Portainer. Ports: public 8085, admin 8086 (LAN only) |
 | 2026-10-11 | v1.1 | Dropped the DMZ design: one host, public page on its own port, admin port LAN-only. Added categories, beneficiary (default Me) with Me/Everyone views, and electricity from watt readings |
 | 2026-10-11 | v1 | Initial spec: static public page, LAN editor, JSON storage, one-time and monthly entries, accrual computed at build time |
