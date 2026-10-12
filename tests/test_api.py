@@ -100,6 +100,12 @@ def test_lists_keep_me_and_values_in_use(client):
     assert ok.json() == {"categories": ["Subscriptions", "Power tools"], "people": ["Me", "Mom"]}
 
 
+def test_reading_with_explicit_date(client):
+    r = client.post("/api/readings", json={"date": "2026-09-15", "watts": 350, "note": "added Unraid"})
+    assert r.status_code == 201, r.text
+    assert r.json()["date"] == "2026-09-15"
+
+
 def test_readings_rates_settings(client):
     assert client.post("/api/readings", json={"watts": 350}).json()["date"] == "2026-10-11"
     client.post("/api/rates", json={"effective_date": "2026-01-01", "rate_per_kwh": 0.15})

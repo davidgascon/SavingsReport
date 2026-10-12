@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import datetime as dt
 import os
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timezone
@@ -68,7 +69,8 @@ class EndIn(BaseModel):
 
 
 class ReadingIn(BaseModel):
-    date: Optional[date] = None
+    # dt.date, not date: a field named "date" would shadow the type here.
+    date: Optional[dt.date] = None
     watts: float = Field(gt=0)
     note: Optional[str] = Field(default=None, max_length=500)
 
